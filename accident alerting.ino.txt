@@ -1,0 +1,131 @@
+/*******************************
+ * getGps() Function
+*******************************/
+void getGps()
+{
+  // Can take up to 60 seconds
+  boolean newData = false;
+  for (unsigned long start = millis(); millis() - start < 2000;){
+    while (neogps.available()){
+      if (gps.encode(neogps.read())){
+        newData = true;
+        break;
+      }
+    }
+  }
+  
+  if (newData) //If newData is true
+  {
+    latitude = String(gps.location.lat(), 6);
+    longitude = String(gps.location.lng(), 6);
+    newData = false;
+  }
+  else {
+    Serial.println("No GPS data is available");
+    latitude = "";
+    longitude = "";
+  }
+
+  Serial.print(","); 
+  Serial.println(latitude);
+  Serial.print(","); 
+  Serial.println(longitude);
+}
+
+
+
+
+/*******************************
+* sendAlert() function
+*******************************/
+void sendAlert()
+{
+  String sms_data;
+  sms_data = "Accident Alert!!\r";
+  sms_data += "http://maps.google.com/maps?q=loc:";
+  sms_data += latitude + "," + longitude;
+
+  sendSms(sms_data);
+}
+
+
+
+
+/*******************************
+* makeCall() function
+*******************************/
+void makeCall()
+{lcd.clear();
+    lcd.setCursor(0,0); //col=0 row=0
+    lcd.print("Calling");
+    lcd.setCursor(0,1); //col=0 row=1
+    lcd.print("Ph:"+String(EMERGENCY_PHONE));
+  //Serial.println("calling....");
+  sim800.println("ATD"+EMERGENCY_PHONE+";");
+  delay(20000); //20 sec delay
+  sim800.println("ATH");
+    
+  delay(1000); //1 sec delay
+
+}
+
+/*******************************
+ * sendSms() function
+ *******************************/
+ void sendSms(String text)
+{
+  //return;
+      lcd.clear();
+    lcd.setCursor(0,0); //col=0 row=0
+    lcd.print("SMS Sent ");
+    lcd.setCursor(0,1); //col=0 row=1
+    lcd.print("Successfully");
+  delay(1000);
+  sim800.print("AT+CMGS=\""+EMERGENCY_PHONE+"\"\r");
+  delay(1000);
+  sim800.print(text);
+  delay(100);
+  sim800.write(0x1A); //ascii code for ctrl-26 //sim800.println((char)26); //ascii code for ctrl-26
+  delay(1000);
+  Serial.println("SMS Sent Successfully.");
+}
+
+
+
+
+
+/*******************************
+ * SendAT() function
+ *******************************/
+boolean SendAT(String at_command, String expected_answer, unsigned int timeout){
+
+    uint8_t x=0;
+    boolean answer=0;
+    String response;
+    unsigned long previous;
+    
+    //Clean the input buffer
+    while( sim800.available() > 0) sim800.read();
+
+    sim800.println(at_command);
+    
+    x = 0;
+    previous = millis();
+
+    //this loop waits for the answer with time out
+    do{
+        //if there are data in the UART input buffer, reads it and checks for the asnwer
+        if(sim800.available() != 0){
+            response += sim800.read();
+            x++;
+            // check if the desired answer (OK) is in the response of the module
+            if(response.indexOf(expected_answer) > 0){
+                answer = 1;
+                break;
+            }
+        }
+    }while((answer == 0) && ((millis() - previous) < timeout));
+
+ // Serial.println(response);
+  return answer;
+}
